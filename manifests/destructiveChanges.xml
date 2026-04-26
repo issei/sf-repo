@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- destructiveChanges.xml — Deleções de metadata -->
+<!-- ⚠️  ATENÇÃO: Este arquivo requer revisão humana OBRIGATÓRIA antes de qualquer deploy -->
+<!-- Adicionar o label 'approved-destructive' ao PR é obrigatório para processar deleções -->
+<!-- Script de verificação: scripts/validation/check-destructive-changes.py -->
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <!-- Adicione aqui os componentes a serem DELETADOS -->
+    <!-- Exemplo:
+    <types>
+        <members>ObsoleteClass</members>
+        <name>ApexClass</name>
+    </types>
+    -->
+    <version>59.0</version>
+</Package>

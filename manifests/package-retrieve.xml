@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- package-retrieve.xml — Manifest para retrieve do estado da org -->
+<!-- Inclui TODOS os componentes do domínio deste time para sincronização -->
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>Order*</members>
+        <members>Commerce*</members>
+        <members>Cart*</members>
+        <members>Checkout*</members>
+        <name>ApexClass</name>
+    </types>
+    <types>
+        <members>OrderTrigger</members>
+        <members>CartTrigger</members>
+        <name>ApexTrigger</name>
+    </types>
+    <types>
+        <members>orderSummary</members>
+        <members>cartWidget</members>
+        <members>checkoutFlow</members>
+        <name>LightningComponentBundle</name>
+    </types>
+    <types>
+        <members>Order_Line_Item__c</members>
+        <members>Cart_Session__c</members>
+        <name>CustomObject</name>
+    </types>
+    <types>
+        <members>Order_*</members>
+        <members>Commerce_*</members>
+        <name>Flow</name>
+    </types>
+    <types>
+        <members>Commerce_User</members>
+        <members>Order_Manager</members>
+        <name>PermissionSet</name>
+    </types>
+    <version>59.0</version>
+</Package>

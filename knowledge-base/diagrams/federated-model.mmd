@@ -1,0 +1,33 @@
+graph TD
+    subgraph "Time Commerce (este repo)"
+        DEV1[Dev Local] --> GH1[GitHub\nteam-commerce-sf]
+        GH1 --> FL1[Flosum Branch\ncommerce/*]
+    end
+
+    subgraph "Time Sales (repo separado)"
+        DEV2[Dev Local] --> GH2[GitHub\nteam-sales-sf]
+        GH2 --> FL2[Flosum Branch\nsales/*]
+    end
+
+    subgraph "Time Service (repo separado)"
+        DEV3[Dev Local] --> GH3[GitHub\nteam-service-sf]
+        GH3 --> FL3[Flosum Branch\nservice/*]
+    end
+
+    subgraph "Flosum — Pipeline Unificado"
+        FL1 --> QA_FL[Flosum: QA Pipeline]
+        FL2 --> QA_FL
+        FL3 --> QA_FL
+        QA_FL --> PREPROD_FL[Flosum: PreProd Pipeline]
+        PREPROD_FL --> PROD_FL[Flosum: Prod Pipeline]
+    end
+
+    subgraph "Orgs Salesforce Compartilhadas"
+        QA_FL --> ORG_QA[(Org QA)]
+        PREPROD_FL --> ORG_PREPROD[(Org PreProd)]
+        PROD_FL --> ORG_PROD[(Org Prod)]
+    end
+
+    style GH1 fill:#2d6a4f,color:#fff
+    style FL1 fill:#1b4332,color:#fff
+    style ORG_PROD fill:#e63946,color:#fff

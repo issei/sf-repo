@@ -1,0 +1,62 @@
+# .devin.yaml
+# Lido pelo Devin no início de toda sessão. Define comportamento, restrições e contexto.
+
+agent:
+  name: "devin"
+  version: "1.0"
+  primary_instruction_file: "CLAUDE.md"
+
+environment:
+  setup_script: "scripts/environment/setup.sh"
+  verify_script: "scripts/environment/verify-dependencies.sh"
+  required_tools:
+    - name: "node"
+      version: ">=20.0.0"
+    - name: "sf"
+      version: ">=2.0.0"
+    - name: "python3"
+      version: ">=3.11.0"
+    - name: "jq"
+      version: ">=1.6"
+    - name: "git"
+      version: ">=2.40.0"
+
+orgs:
+  - alias: "qa"
+    purpose: "quality-assurance"
+    access: "read-validate"
+    auth_method: "jwt"
+    credential_env: "SF_JWT_KEY_QA"
+  - alias: "preprod"
+    purpose: "pre-production"
+    access: "read-validate"
+    auth_method: "jwt"
+    credential_env: "SF_JWT_KEY_PREPROD"
+  - alias: "prod"
+    purpose: "production"
+    access: "read-only"
+    auth_method: "jwt"
+    credential_env: "SF_JWT_KEY_PROD"
+
+flosum:
+  api_base_url_env: "FLOSUM_API_BASE_URL"
+  token_env: "FLOSUM_API_TOKEN"
+  pipeline_id_env: "FLOSUM_PIPELINE_ID"
+  branch_prefix: "devin/"
+
+safety:
+  require_human_approval_for:
+    - destructive_changes
+    - prod_promotion
+    - shared_component_changes
+  ownership_file: "knowledge-base/metadata-ownership.yaml"
+  max_components_per_deploy: 50
+
+branching:
+  base_branch: "main"
+  feature_prefix: "feature/"
+  fix_prefix: "fix/"
+  devin_prefix: "devin/"
+  protected_branches:
+    - "main"
+    - "release/*"
