@@ -12,9 +12,9 @@
 ## FASE 1: Preparação do Ambiente Efêmero (Scratch Org)
 
 Como trabalhamos em um modelo modular e seguro, você não desenvolverá diretamente na Org compartilhada. Você usará uma Scratch Org.
-Utilize a Agent Skill importada do repositório `sf-skills` para criar o ambiente.
+Utilize a Agent Skill local de `.agents/skills/` para criar o ambiente.
 
-1. **Criar Scratch Org:** Invoque a skill apropriada (ex: `@skills:create-scratch-org`) ou execute:
+1. **Criar Scratch Org:** Invoque a skill apropriada (ex: `@sf-deploy`) ou execute:
    `sf org create scratch -f config/project-scratch-def.json -a devin-scratch -d -y 1`
 2. **Deploy Inicial (Push):**
    Envie o código base atual para a Scratch Org:
@@ -27,9 +27,9 @@ Utilize a Agent Skill importada do repositório `sf-skills` para criar o ambient
 
 ## FASE 2: Desenvolvimento da Funcionalidade
 
-Ao codificar Classes Apex, LWC ou Triggers, apoie-se nas Agent Skills do `Jaganpro/sf-skills` para acelerar a criação de esqueletos estruturais e manter o padrão.
+Ao codificar Classes Apex, LWC ou Triggers, apoie-se nas Agent Skills de `.agents/skills/` para acelerar a criação de esqueletos estruturais e manter o padrão.
 
-1. **Criação de Arquivos:** Se precisar criar uma nova classe ou componente, use as skills (ex: `@skills:create-apex-class` ou `@skills:create-lwc`).
+1. **Criação de Arquivos:** Se precisar criar uma nova classe ou componente, use as skills (ex: `@sf-apex` ou `@sf-lwc`).
 2. **Respeito aos Limites:** Nunca modifique objetos padrão (ex: `Account`) se isso for proibido no seu `domain_boundaries.md`.
 3. **Rastreamento de Mudanças:** Como a Scratch Org possui *Source Tracking*, faça as alterações e garanta que elas estejam sincronizadas com o seu workspace local:
    `sf project retrieve start --target-org devin-scratch`
@@ -42,14 +42,15 @@ Você não tem permissão para abrir um Pull Request se o código não passar ne
 
 **Passo 3.1: Testes Unitários Apex**
 Execute a suite de testes localmente na Scratch Org. Nossa meta de cobertura de código é **estritamente superior a 85%**.
-- Use a skill do repositório: `@skills:run-apex-tests` 
+- Use a skill do repositório: `@sf-testing` 
 - *Fallback (CLI):* `sf apex run test --target-org devin-scratch --code-coverage --result-format human --wait 10`
 - **Regra de Auto-Correção:** Se a cobertura for menor que 85% ou testes falharem, **não peça ajuda ao humano**. Analise o log de erro, corrija a classe de teste, faça o deploy novamente e re-execute a suite.
 
 **Passo 3.2: Análise Estática (Salesforce Code Analyzer)**
 Não injete dívida técnica. Verifique vulnerabilidades (Injeção SOQL, FLS, problemas de PMD).
-- Use a skill correspondente (ex: `@skills:run-sfdx-scanner`) ou execute:
-  `sf scanner run --target force-app --engine pmd,eslint --severity-threshold 3 --format table`
+- Use a skill correspondente (ex: `@sf-deploy`) ou execute:
+  `sf code-analyzer run --target force-app --engine pmd,eslint --severity-threshold 3 --format table`
+  <!-- GAP: não existe skill local dedicada para análise estática/Code Analyzer; @sf-deploy cobre este passo no pipeline de CI/CD (Code Analyzer v5). Considere criar a skill sf-code-analyzer para cobertura explícita. -->
 - **Regra de Auto-Correção:** Se o scanner retornar severidade 1, 2 ou 3, você deve refatorar o código para corrigir o apontamento antes de prosseguir.
 
 ---
@@ -60,4 +61,4 @@ Não injete dívida técnica. Verifique vulnerabilidades (Injeção SOQL, FLS, p
 2. **Commit Estruturado:**
    Faça o commit das alterações com uma mensagem descritiva (ex: `feat(sales-core): adiciona calculo de margem na Quote`).
 3. **Próximo Passo:**
-   Agora que o desenvolvimento e os testes locais estão concluídos, leia o playbook `playbooks/03_flosum_integration.md` para validar seu pacote contra a Org de QA via Flosum CLI antes de abrir o Pull Request.
+   Agora que o desenvolvimento e os testes locais estão concluídos, leia o playbook `playbooks/03_flosum_integration.md` para validar seu pacote contra a Org de QA via Flosum CLI antes de abrir o Pull Request. <!-- TODO: playbooks/03_flosum_integration.md ainda não foi criado — referência futura pendente. -->
