@@ -44,6 +44,18 @@ desktop.ini
 .env
 .env.local
 .env.*.local
+.envrc
+
+# Chaves privadas e certificados — NUNCA commitar
+server.key
+*.key
+*.pem
+*.crt
+*.cer
+*.p8
+*.p12
+*.pfx
+*.jks
 
 # Dependências
 node_modules/
