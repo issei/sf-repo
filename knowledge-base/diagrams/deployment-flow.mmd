@@ -1,0 +1,42 @@
+flowchart TD
+    START([Tarefa recebida]) --> READ[Ler knowledge-base/\nmetadata-ownership.yaml]
+    READ --> BRANCH[Criar branch\ndevin/{ticket}-{slug}]
+    BRANCH --> DEV[Desenvolver em\nforce-app/]
+    DEV --> OWN{check-metadata\n-ownership.py}
+    OWN -->|Violação| FIX_OWN[Remover componentes\nfora do escopo]
+    FIX_OWN --> OWN
+    OWN -->|OK| DESTR{Mudanças\ndestrutivas?}
+    DESTR -->|Sim| HUMAN1[🛑 Aprovação\nhumana obrigatória]
+    HUMAN1 --> DESTR_OK[Aguardar label\napproved-destructive]
+    DESTR_OK --> VALIDATE
+    DESTR -->|Não| VALIDATE[validate-deploy.sh\ncheckOnly na org QA]
+    VALIDATE -->|Falhou| LOG1[log-failure.py\nConsultar known-issues.md]
+    LOG1 --> FIX_ERR[Corrigir erro]
+    FIX_ERR --> VALIDATE
+    VALIDATE -->|OK| TESTS[run-tests.sh\nCobertura >= 75%]
+    TESTS -->|Falhou| FIX_TEST[Corrigir testes]
+    FIX_TEST --> TESTS
+    TESTS -->|OK| PR[Abrir Pull Request\ncom template preenchido]
+    PR --> REVIEW{Aprovação\nhumana}
+    REVIEW -->|Não aprovado| ADJUST[Ajustar conforme\nfeedback]
+    ADJUST --> REVIEW
+    REVIEW -->|Aprovado| FLOSUM_BRANCH[create-branch.py\nno Flosum]
+    FLOSUM_BRANCH --> LINK[link-commit-to-branch.py]
+    LINK --> PROMOTE_QA[trigger-promotion.py\ntarget: qa]
+    PROMOTE_QA --> POLL_QA{get-promotion\n-status.py}
+    POLL_QA -->|In Progress| WAIT_QA[Aguardar 30s]
+    WAIT_QA --> POLL_QA
+    POLL_QA -->|Failed| ROLLBACK[Playbook 05:\nRollback]
+    POLL_QA -->|Succeeded| TAG_QA[Tag:\nflosum/promoted/qa/*]
+    TAG_QA --> REPORT_QA[generate-deploy-report.py]
+    REPORT_QA --> PROMOTE_PREPROD[trigger-promotion.py\ntarget: preprod]
+    PROMOTE_PREPROD --> POLL_PP{get-promotion\n-status.py}
+    POLL_PP -->|Succeeded| HUMAN2[🛑 Aprovação para\nProdução obrigatória]
+    HUMAN2 --> PROMOTE_PROD[trigger-promotion.py\ntarget: prod]
+    PROMOTE_PROD --> POLL_PROD{get-promotion\n-status.py}
+    POLL_PROD -->|Succeeded| DONE([Concluído ✅])
+
+    style HUMAN1 fill:#e63946,color:#fff
+    style HUMAN2 fill:#e63946,color:#fff
+    style DONE fill:#2d6a4f,color:#fff
+    style ROLLBACK fill:#e76f51,color:#fff

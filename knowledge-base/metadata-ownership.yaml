@@ -1,0 +1,57 @@
+# metadata-ownership.yaml
+# Fonte de verdade sobre o que este time possui.
+# Modificado APENAS por humanos, nunca pelo agente.
+# Última revisão: 2026-01-15 | Revisor: @joao.silva
+
+team:
+  name: "commerce"
+  description: "Time responsável pelo domínio de Comércio e Pedidos"
+  slack_channel: "#sf-commerce"
+  owner_github: "@team-commerce"
+
+# Ownership exclusivo — apenas este time modifica
+exclusive:
+  ApexClass:
+    - "Order*"
+    - "Commerce*"
+    - "Cart*"
+    - "Checkout*"
+  ApexTrigger:
+    - "OrderTrigger"
+    - "CartTrigger"
+  LightningComponentBundle:
+    - "orderSummary"
+    - "cartWidget"
+    - "checkoutFlow"
+  CustomObject:
+    - "Order_Line_Item__c"
+    - "Cart_Session__c"
+  CustomField:
+    - "Order.*"
+    - "Order_Line_Item__c.*"
+  Flow:
+    - "Order_*"
+    - "Commerce_*"
+  PermissionSet:
+    - "Commerce_User"
+    - "Order_Manager"
+
+# Ownership compartilhado — coordenar antes de modificar
+shared:
+  - metadata_type: "CustomApplication"
+    component: "SalesConsole"
+    co_owners: ["@team-sales", "@team-commerce"]
+    coordination_required: true
+  - metadata_type: "Profile"
+    component: "Sales_User"
+    co_owners: ["@team-sales", "@team-commerce", "@team-service"]
+    coordination_required: true
+    note: "Mudanças em Profile requerem aprovação de todos os co-owners"
+
+# Explicitamente fora do escopo — nunca modificar
+out_of_scope:
+  - "Case*"
+  - "Lead*"
+  - "Campaign*"
+  - "Service_*"
+  - "Support_*"

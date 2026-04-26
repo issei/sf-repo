@@ -1,0 +1,80 @@
+name: Validate PR
+
+on:
+  pull_request:
+    branches:
+      - main
+      - 'release/**'
+    paths:
+      - 'force-app/**'
+      - 'manifests/**'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Salesforce CLI
+        run: npm install -g @salesforce/cli@latest
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install pyyaml requests python-dotenv
+
+      - name: Authenticate org QA (JWT)
+        run: |
+          echo "$SF_JWT_KEY_QA" | base64 -d > /tmp/jwt_key_qa.pem
+          chmod 600 /tmp/jwt_key_qa.pem
+          sf org login jwt \
+            --client-id "$SF_CLIENT_ID_QA" \
+            --jwt-key-file /tmp/jwt_key_qa.pem \
+            --username "$SF_USERNAME_QA" \
+            --instance-url "$SF_INSTANCE_URL_QA" \
+            --alias qa
+          rm -f /tmp/jwt_key_qa.pem
+        env:
+          SF_CLIENT_ID_QA: ${{ secrets.SF_CLIENT_ID_QA }}
+          SF_JWT_KEY_QA: ${{ secrets.SF_JWT_KEY_QA }}
+          SF_USERNAME_QA: ${{ secrets.SF_USERNAME_QA }}
+          SF_INSTANCE_URL_QA: ${{ secrets.SF_INSTANCE_URL_QA }}
+
+      - name: Check metadata ownership
+        run: |
+          python scripts/validation/check-metadata-ownership.py \
+            --manifest manifests/package-deploy.xml \
+            --ownership knowledge-base/metadata-ownership.yaml \
+            --fail-on-violation
+        env:
+          TEAM_NAME: ${{ vars.TEAM_NAME }}
+
+      - name: Check for destructive changes
+        run: |
+          python scripts/validation/check-destructive-changes.py \
+            --destructive-manifest manifests/destructiveChanges.xml \
+            --require-human-label "approved-destructive"
+
+      - name: Check shared component impact
+        run: |
+          python scripts/validation/check-shared-components.py \
+            --manifest manifests/package-deploy.xml \
+            --ownership knowledge-base/metadata-ownership.yaml
+
+      - name: Validate deploy (checkOnly)
+        run: |
+          bash scripts/salesforce/validate-deploy.sh qa manifests/package-deploy.xml
+        env:
+          TEAM_NAME: ${{ vars.TEAM_NAME }}
+
+      - name: Run Apex tests
+        run: |
+          bash scripts/salesforce/run-tests.sh qa

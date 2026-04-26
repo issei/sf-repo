@@ -1,0 +1,43 @@
+name: Check Metadata Ownership
+
+on:
+  pull_request:
+    paths:
+      - 'force-app/**'
+      - 'manifests/**'
+
+jobs:
+  ownership-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pyyaml requests
+
+      - name: Check metadata ownership
+        run: |
+          python scripts/validation/check-metadata-ownership.py \
+            --manifest manifests/package-deploy.xml \
+            --ownership knowledge-base/metadata-ownership.yaml \
+            --fail-on-violation
+        env:
+          TEAM_NAME: ${{ vars.TEAM_NAME }}
+
+      - name: Check for destructive changes
+        run: |
+          python scripts/validation/check-destructive-changes.py \
+            --destructive-manifest manifests/destructiveChanges.xml \
+            --require-human-label "approved-destructive"
+        continue-on-error: false
+
+      - name: Check shared component impact
+        run: |
+          python scripts/validation/check-shared-components.py \
+            --manifest manifests/package-deploy.xml \
+            --ownership knowledge-base/metadata-ownership.yaml

@@ -1,0 +1,50 @@
+graph LR
+    subgraph "Domínio Commerce (este time)"
+        C1[ApexClass: Order*]
+        C2[ApexClass: Commerce*]
+        C3[ApexClass: Cart*]
+        C4[ApexClass: Checkout*]
+        C5[ApexTrigger: OrderTrigger]
+        C6[ApexTrigger: CartTrigger]
+        C7[LWC: orderSummary]
+        C8[LWC: cartWidget]
+        C9[LWC: checkoutFlow]
+        C10[CustomObject: Order_Line_Item__c]
+        C11[CustomObject: Cart_Session__c]
+        C12[Flow: Order_*]
+        C13[Flow: Commerce_*]
+        C14[PermissionSet: Commerce_User]
+        C15[PermissionSet: Order_Manager]
+    end
+
+    subgraph "Domínio Sales"
+        S1[ApexClass: Lead*]
+        S2[ApexClass: Opportunity*]
+        S3[Flow: Lead_*]
+        S4[PermissionSet: Sales_*]
+    end
+
+    subgraph "Domínio Service"
+        SV1[ApexClass: Case*]
+        SV2[ApexClass: Service_*]
+        SV3[Flow: Case_*]
+        SV4[PermissionSet: Service_*]
+    end
+
+    subgraph "Componentes Compartilhados ⚠️"
+        SH1[CustomApplication: SalesConsole]
+        SH2[Profile: Sales_User]
+    end
+
+    C1 -.->|co-owner| SH1
+    S1 -.->|co-owner| SH1
+    C1 -.->|co-owner| SH2
+    S1 -.->|co-owner| SH2
+    SV1 -.->|co-owner| SH2
+
+    style SH1 fill:#f4a261,color:#000
+    style SH2 fill:#f4a261,color:#000
+    style C1 fill:#2d6a4f,color:#fff
+    style C2 fill:#2d6a4f,color:#fff
+    style C3 fill:#2d6a4f,color:#fff
+    style C4 fill:#2d6a4f,color:#fff
