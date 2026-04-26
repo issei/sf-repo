@@ -1,0 +1,49 @@
+name: Sync Flosum Status
+
+on:
+  workflow_dispatch:
+    inputs:
+      flosum_branch_id:
+        description: 'ID do branch Flosum para sincronizar'
+        required: true
+      environment:
+        description: 'Ambiente da promoção (qa, preprod, prod)'
+        required: true
+        default: 'qa'
+  schedule:
+    - cron: '*/15 * * * *'
+
+jobs:
+  sync-status:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests pyyaml python-dotenv
+
+      - name: Get promotion status
+        run: |
+          python scripts/flosum/get-promotion-status.py \
+            --pipeline-id "$FLOSUM_PIPELINE_ID" \
+            --environment "${{ github.event.inputs.environment || 'qa' }}"
+        env:
+          FLOSUM_API_BASE_URL: ${{ secrets.FLOSUM_API_BASE_URL }}
+          FLOSUM_API_TOKEN: ${{ secrets.FLOSUM_API_TOKEN }}
+          FLOSUM_PIPELINE_ID: ${{ secrets.FLOSUM_PIPELINE_ID }}
+
+      - name: Link commit to Flosum branch
+        if: ${{ github.event.inputs.flosum_branch_id != '' }}
+        run: |
+          python scripts/flosum/link-commit-to-branch.py \
+            --flosum-branch-id "${{ github.event.inputs.flosum_branch_id }}" \
+            --commit-sha "$GITHUB_SHA" \
+            --pr-url "${{ github.event.pull_request.html_url || '' }}"
+        env:
+          FLOSUM_API_BASE_URL: ${{ secrets.FLOSUM_API_BASE_URL }}
+          FLOSUM_API_TOKEN: ${{ secrets.FLOSUM_API_TOKEN }}
