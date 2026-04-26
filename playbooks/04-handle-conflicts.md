@@ -75,6 +75,8 @@ Quando os times chegarem a acordo:
 
 ## Conflitos de Merge no Git
 
+### Conflitos simples (arquivos de texto não-XML)
+
 Se houver conflito de merge ao fazer rebase/merge em `main`:
 
 ```bash
@@ -90,6 +92,27 @@ Se conflitos aparecerem em arquivos de outro time:
 # Aceitar a versão do main para arquivos conflitantes de outros times
 git checkout origin/main -- force-app/main/default/classes/CaseService.cls
 git add force-app/main/default/classes/CaseService.cls
+```
+
+### Conflitos complexos (XML, Profiles, Layouts, Permission Sets)
+
+🛑 **Conflitos de metadados complexos (XML, Profiles, Layouts, Permission Sets) NÃO devem
+ser resolvidos pelo Devin via Git Rebase ou edição manual de XML.**
+
+Em caso de conflito nesse tipo de arquivo, o Devin deve:
+
+1. **Alertar o revisor humano** imediatamente com o nome dos arquivos conflitantes
+2. **Não tentar mesclar manualmente** arquivos XML de metadata Salesforce — a estrutura
+   é frágil e uma mesclagem incorreta pode corromper silenciosamente o componente
+3. **Solicitar que o conflito seja resolvido** utilizando a ferramenta **"Smart Merge"**
+   na interface web do Flosum, que entende a semântica do metadata Salesforce
+
+```
+Ação correta do Devin:
+  → Registrar o conflito via log-failure.py
+  → Abrir issue usando .github/ISSUE_TEMPLATE/metadata-conflict.md
+  → Comentar no PR: "Conflito complexo em [arquivo.xml] — requer Smart Merge no Flosum"
+  → Aguardar resolução humana antes de prosseguir
 ```
 
 ---

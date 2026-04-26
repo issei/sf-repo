@@ -48,14 +48,26 @@ Refs: #<número-da-issue>
 Tipos: `feat`, `fix`, `refactor`, `test`, `chore`, `docs`
 Escopo: nome do componente ou domínio (ex: `OrderTrigger`, `CommercePricing`)
 
+## Regra de Ouro da Orquestração
+
+> **O Devin opera localmente via Devin CLI ou Workspace. O fluxo correto é:**
+> 1. Ler a spec em `specs/`
+> 2. Codificar em `force-app/`
+> 3. Validar via `sf project deploy start --check-only` na Sandbox
+> 4. Abrir o PR no GitHub
+>
+> **O DEVIN NUNCA USA COMANDOS DIRETOS DE DEPLOY PARA AMBIENTES COMPARTILHADOS (QA/PROD).**
+> Quem faz deploy é o **Flosum**, escutando o merge da branch `main` no Git via webhook nativo.
+
 ## Quando Pedir Ajuda Humana
 
 Acione revisão humana se:
 - Detectar metadata de outro time no conjunto de mudanças
 - A validação na org falhar com erros não documentados em `known-issues.md`
-- A API do Flosum retornar erro 4xx ou 5xx por mais de 2 tentativas
+- O webhook ou pipeline do Flosum reportar falha após o merge em `main`
 - Qualquer operação destrutiva for necessária
 - Uma alteração parecer cruzar a fronteira do domínio definida em `metadata-ownership.yaml`
+- Conflito de merge complexo em arquivos XML, Profiles ou Layouts (usar Smart Merge do Flosum)
 
 ## Referência Rápida de Scripts
 
@@ -70,21 +82,19 @@ Acione revisão humana se:
 | Verificar ownership | `scripts/validation/check-metadata-ownership.py` |
 | Verificar mudanças destrutivas | `scripts/validation/check-destructive-changes.py` |
 | Verificar componentes compartilhados | `scripts/validation/check-shared-components.py` |
-| Criar branch no Flosum | `scripts/flosum/create-branch.py` |
-| Disparar promoção | `scripts/flosum/trigger-promotion.py` |
-| Verificar status de promoção | `scripts/flosum/get-promotion-status.py` |
 | Registrar falha | `scripts/reporting/log-failure.py` |
 | Gerar relatório de deploy | `scripts/reporting/generate-deploy-report.py` |
 
 ## Fluxo de Trabalho Resumido
 
 ```
-1. Ler knowledge-base/ (ownership + orgs + pipeline)
-2. Criar branch: devin/{ticket}-{slug}
-3. Desenvolver em force-app/
-4. Executar check-metadata-ownership.py
-5. Executar validate-deploy.sh (checkOnly na org QA)
-6. Abrir PR com template preenchido
-7. Aguardar aprovação humana
-8. Flosum promove: QA → PreProd → Prod
+1. Ler specs/ (spec da tarefa atual)
+2. Ler knowledge-base/ (ownership + orgs + pipeline)
+3. Criar branch: devin/{ticket}-{slug}
+4. Desenvolver em force-app/
+5. Executar check-metadata-ownership.py
+6. Executar: sf project deploy start --check-only --target-org qa
+7. Abrir PR com template preenchido
+8. Aguardar aprovação humana + merge em main
+9. Flosum detecta o merge e promove: QA → PreProd → Prod (automaticamente)
 ```

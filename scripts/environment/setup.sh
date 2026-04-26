@@ -13,7 +13,6 @@ required_vars=(
   "SF_CLIENT_ID_QA" "SF_JWT_KEY_QA" "SF_USERNAME_QA"
   "SF_CLIENT_ID_PREPROD" "SF_JWT_KEY_PREPROD" "SF_USERNAME_PREPROD"
   "SF_CLIENT_ID_PROD" "SF_JWT_KEY_PROD" "SF_USERNAME_PROD"
-  "FLOSUM_API_BASE_URL" "FLOSUM_API_TOKEN" "FLOSUM_PIPELINE_ID"
 )
 missing=()
 for var in "${required_vars[@]}"; do
@@ -46,12 +45,20 @@ echo "✅ sf CLI: ${SF_VERSION}"
 
 sf plugins install @salesforce/plugin-packaging 2>/dev/null || true
 
-# ── 4. Instalar dependências Python ──────────────────────────────────────────
-echo "📦 Instalando dependências Python..."
-pip install --quiet requests pyyaml python-dotenv tabulate 2>/dev/null || \
-  pip3 install --quiet requests pyyaml python-dotenv tabulate
+# ── 4. Instalar Flosum CLI ────────────────────────────────────────────────────
+if ! command -v flosum &>/dev/null; then
+  echo "📦 Instalando Flosum CLI..."
+  npm install -g @flosum/cli
+fi
+FLOSUM_VERSION=$(flosum --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+' | head -1 || echo "instalado")
+echo "✅ Flosum CLI: ${FLOSUM_VERSION}"
 
-# ── 5. Autenticar nas orgs via JWT ───────────────────────────────────────────
+# ── 5. Instalar dependências Python ──────────────────────────────────────────
+echo "📦 Instalando dependências Python (scripts de validação)..."
+pip install --quiet pyyaml python-dotenv tabulate 2>/dev/null || \
+  pip3 install --quiet pyyaml python-dotenv tabulate
+
+# ── 6. Autenticar nas orgs via JWT ───────────────────────────────────────────
 authenticate_org() {
   local alias=$1 client_id=$2 jwt_key_b64=$3 username=$4 instance_url=$5
   echo "🔐 Autenticando na org: ${alias}..."
@@ -74,11 +81,6 @@ authenticate_org "preprod" "$SF_CLIENT_ID_PREPROD" "$SF_JWT_KEY_PREPROD" \
   "$SF_USERNAME_PREPROD" "${SF_INSTANCE_URL_PREPROD:-https://test.salesforce.com}"
 authenticate_org "prod"    "$SF_CLIENT_ID_PROD"    "$SF_JWT_KEY_PROD"    \
   "$SF_USERNAME_PROD"    "${SF_INSTANCE_URL_PROD:-https://login.salesforce.com}"
-
-# ── 6. Verificar conectividade Flosum ────────────────────────────────────────
-echo "🔗 Verificando conectividade com Flosum API..."
-python3 "${SCRIPT_DIR}/../flosum/flosum_api.py" --check-connectivity
-echo "✅ Flosum API acessível."
 
 # ── 7. Validar arquivo de ownership ──────────────────────────────────────────
 echo "📋 Validando metadata-ownership.yaml..."

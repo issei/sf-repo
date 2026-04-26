@@ -1,0 +1,19 @@
+{
+  "packageDirectories": [
+    {
+      "path": "force-app",
+      "default": true,
+      "package": "sf-repo",
+      "versionName": "ver 0.1",
+      "versionNumber": "0.1.0.NEXT"
+    }
+  ],
+  "namespace": "",
+  "sourceApiVersion": "65.0",
+  "sfdcLoginUrl": "https://login.salesforce.com",
+  "plugins": {
+    "mdTransformer": {
+      "ignoreConflicts": false
+    }
+  }
+}
