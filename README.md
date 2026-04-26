@@ -18,7 +18,7 @@ O Devin começa cada sessão do zero — sem memória da sessão anterior. Cada 
 - `AGENTS.md` — protocolo de inicialização obrigatório
 - `knowledge-base/` — arquitetura, orgs e domínios do projeto
 - `playbooks/` — passo a passo para cada tipo de tarefa
-- `.agents/skills/` — skills especializadas que ampliam as capacidades do Devin
+- `.agents/` — skills especializadas que ampliam as capacidades do Devin
 - `scripts/` — setup de ambiente e autenticação idempotentes
 
 > **Regra de ouro:** se algo precisa ser lembrado entre sessões, deve estar neste repositório.
@@ -32,12 +32,15 @@ O Devin começa cada sessão do zero — sem memória da sessão anterior. Cada 
   - [.agents/](#agents)
   - [.claude/](#claude)
   - [.github/](#github)
-  - [data-seeding/](#data-seeding)
   - [docs/](#docs)
+  - [force-app/](#force-app)
   - [knowledge-base/](#knowledge-base)
+  - [manifests/](#manifests)
   - [playbooks/](#playbooks)
   - [prompts/](#prompts)
+  - [reports/](#reports)
   - [scripts/](#scripts)
+  - [specs/](#specs)
 - [Arquivos Raiz](#arquivos-raiz)
 - [Skills Disponíveis](#skills-disponíveis)
 - [Fluxo de Trabalho](#fluxo-de-trabalho)
@@ -78,17 +81,19 @@ Os **Secrets obrigatórios** (`SF_CLIENT_ID`, `SF_USERNAME_QA`, `SF_JWT_KEY_BASE
 
 ```
 sf-repo/
-├── .agents/
-│   └── skills/                 # Skills Salesforce especializadas para o Devin
+├── .agents/                    # Skills Salesforce especializadas para o Devin
 ├── .claude/                    # Configurações do Claude Code (uso auxiliar)
 ├── .github/
 │   └── workflows/              # Workflows GitHub Actions (lint, validação)
-├── data-seeding/               # Scripts de seed de dados para orgs de teste
 ├── docs/                       # Documentação técnica e relatórios gerados
+├── force-app/                  # Código-fonte Salesforce (estrutura SFDX)
 ├── knowledge-base/             # Arquitetura, orgs, domínios — contexto do Devin
+├── manifests/                  # package.xml e destructiveChanges para deploy/retrieve
 ├── playbooks/                  # Procedimentos passo a passo para o Devin seguir
 ├── prompts/                    # Prompts reutilizáveis para tarefas recorrentes
-├── scripts/                    # Setup de ambiente e autenticação (rodados a cada sessão)
+├── reports/                    # Relatórios e logs de deploy gerados
+├── scripts/                    # Setup de ambiente e automação (rodados a cada sessão)
+├── specs/                      # Especificações de features para o Devin implementar
 ├── AGENTS.md                   # Protocolo obrigatório de inicialização do Devin
 └── CLAUDE.md                   # Instruções de comportamento para o agente Claude
 ```
@@ -100,7 +105,7 @@ sf-repo/
 Contém as **skills** do Devin — módulos de conhecimento especializado que ampliam as capacidades do agente para tarefas Salesforce específicas, seguindo os padrões de qualidade da equipe. Cada skill é carregada sob demanda pelo Devin, reduzindo o consumo de ACUs ao evitar que o agente "descubra" boas práticas por tentativa e erro.
 
 ```
-.agents/skills/
+.agents/
 │
 ├── # — Flosum (pipeline CI/CD)
 ├── flosum-auth/                # Autenticação no Flosum CLI
@@ -187,12 +192,6 @@ Os workflows aqui **não substituem o Flosum** como ferramenta de deploy. Seu pa
 
 ---
 
-### `data-seeding/`
-
-Configurações e scripts para popular orgs com dados de teste padronizados. Garante consistência entre ambientes ao criar registros necessários para desenvolvimento e QA.
-
----
-
 ### `docs/`
 
 Documentação técnica gerada ou mantida pela equipe:
@@ -204,16 +203,69 @@ Documentação técnica gerada ou mantida pela equipe:
 
 ---
 
+### `force-app/`
+
+Código-fonte Salesforce no formato **SFDX** — é aqui que o Devin cria e edita metadados durante o desenvolvimento:
+
+```
+force-app/main/default/
+├── aura/           # Componentes Aura
+├── classes/        # Classes Apex e triggers
+├── flows/          # Definições de Flow
+├── lwc/            # Lightning Web Components
+├── objects/        # Objetos customizados e campos
+├── permissionsets/ # Permission Sets
+└── triggers/       # Apex Triggers
+```
+
+Todo desenvolvimento começa aqui. Após validação, o conteúdo é promovido via Flosum.
+
+---
+
+### `manifests/`
+
+Arquivos XML que controlam quais metadados são incluídos nas operações de deploy e retrieve:
+
+| Arquivo | Descrição |
+|---------|-----------|
+| `package-deploy.xml` | Manifesto para operações de deploy |
+| `package-retrieve.xml` | Manifesto para retrieve de metadados |
+| `destructiveChanges.xml` | Manifesto de mudanças destrutivas |
+
+> Sempre execute `scripts/validation/check-metadata-ownership.py` antes de gerar ou modificar um `package.xml`.
+
+---
+
+### `reports/`
+
+Relatórios e logs gerados pelo Devin durante as operações de deploy. Os arquivos são criados via `scripts/reporting/generate-deploy-report.py` e `scripts/reporting/log-failure.py`.
+
+---
+
+### `specs/`
+
+Especificações de features que o Devin lê **antes de iniciar o desenvolvimento**. Use `specs/_TEMPLATE.md` como base ao criar uma nova spec.
+
+---
+
 ### `knowledge-base/`
 
 **Contexto arquitetural do projeto para o Devin.** É aqui que o agente encontra as informações que precisaria perguntar ao time — evitando chamadas desnecessárias que consumiriam ACUs:
 
 ```
 knowledge-base/
-└── 01_domain_boundaries.md     # Fronteiras de domínio e mapa de responsabilidades
+├── README.md                      # Guia de navegação desta pasta
+├── 01_domain_boundaries.md        # Fronteiras de domínio e mapa de responsabilidades
+├── architecture-overview.md       # Visão geral da arquitetura do sistema
+├── flosum-pipeline-map.md         # Fluxo e estágios do pipeline Flosum
+├── known-issues.md                # Problemas conhecidos e workarounds
+├── metadata-ownership.yaml        # Ownership de metadados por time
+├── org-inventory.md               # IDs e propósitos das orgs (QA, PreProd, Prod)
+├── team-contacts.md               # Contatos da equipe
+└── diagrams/                      # Diagramas de arquitetura
 ```
 
-Deve conter: IDs e propósitos de cada org, mapa do pipeline Flosum, ownership de metadados por time, diagramas de arquitetura, decisões técnicas (ADRs) e modelo de dados. Quanto mais completa esta pasta, menos o Devin precisa interromper o trabalho para pedir contexto.
+Quanto mais completa esta pasta, menos o Devin precisa interromper o trabalho para pedir contexto.
 
 ---
 
@@ -223,11 +275,18 @@ Deve conter: IDs e propósitos de cada org, mapa do pipeline Flosum, ownership d
 
 ```
 playbooks/
-└── 01_development.md           # Criação de Scratch Org, desenvolvimento,
-                                # testes Apex e análise estática
+├── README.md                         # Guia de navegação desta pasta
+├── 00-setup-environment.md           # Checklist de configuração do ambiente
+├── 01-retrieve-org-state.md          # Recuperar metadados de orgs
+├── 01_development.md                 # Criação de Scratch Org, desenvolvimento, testes e lint
+├── 02-develop-and-validate.md        # Fluxo de desenvolvimento e validação
+├── 03-promote-via-flosum.md          # Procedimentos de promoção via Flosum
+├── 04-handle-conflicts.md            # Estratégias de resolução de conflitos
+├── 05-rollback-procedure.md          # Passos para rollback
+└── 06-hotfix-protocol.md             # Protocolo de hotfix de emergência
 ```
 
-Cada playbook elimina a necessidade de o Devin "inferir" o procedimento correto. Quanto mais detalhados, menor o risco de erros e menor o consumo de ACUs com retrabalho. Devem cobrir: setup, desenvolvimento de features, validação, deploy via Flosum, rollback, hotfix e resolução de conflitos.
+Cada playbook elimina a necessidade de o Devin "inferir" o procedimento correto, reduzindo o risco de erros e o consumo de ACUs com retrabalho.
 
 ---
 
@@ -243,13 +302,29 @@ Scripts de automação executados no setup e operação do ambiente:
 
 ```
 scripts/
-├── 01_setup_env.sh     # Instala Node.js LTS, Salesforce CLI e plugins obrigatórios
-│                       # (flosum-sfdx-plugin, code-analyzer, sfdmu, sfdx-git-delta)
-│                       # Aplica configurações globais (telemetria off, memória Node)
+├── 01_setup_env.sh             # Instala Node.js LTS, Salesforce CLI e plugins obrigatórios
+│                               # (flosum-sfdx-plugin, code-analyzer, sfdmu, sfdx-git-delta)
+├── 02_auth_orgs.sh             # Autentica nas orgs Salesforce via JWT
 │
-└── 02_auth_orgs.sh     # Valida secrets obrigatórios no painel da Cognition
-                        # Decodifica certificado JWT (Base64) e autentica nas orgs
-                        # Valida conexão e apaga server.key do disco ao final
+├── environment/
+│   ├── setup.sh                # Setup geral do ambiente
+│   ├── authenticate-orgs.sh    # Autenticação nas orgs
+│   └── verify-dependencies.sh  # Verifica ferramentas obrigatórias
+│
+├── salesforce/
+│   ├── validate-deploy.sh      # Validação de deploy (checkOnly)
+│   ├── run-tests.sh            # Executa testes Apex
+│   ├── retrieve-metadata.sh    # Recupera metadados de uma org
+│   └── compare-org-state.py    # Compara estado de metadados entre orgs
+│
+├── reporting/
+│   ├── generate-deploy-report.py  # Gera relatório de deploy
+│   └── log-failure.py             # Registra falha de deploy
+│
+└── validation/
+    ├── check-metadata-ownership.py    # Verifica ownership dos metadados
+    ├── check-destructive-changes.py   # Valida mudanças destrutivas
+    └── check-shared-components.py     # Verifica componentes compartilhados
 ```
 
 > **Importante:** os scripts são idempotentes — podem ser executados múltiplas vezes com segurança.
@@ -263,6 +338,9 @@ scripts/
 | `AGENTS.md` | **Leitura obrigatória para o Devin a cada sessão.** Define a identidade do projeto, protocolo de inicialização, fluxo de trabalho padrão e regras de comportamento. É a primeira coisa que o agente deve ler. |
 | `CLAUDE.md` | Instruções de comportamento para o agente Claude (escopo, regras invioláveis, convenções de commit, quando pedir ajuda humana). |
 | `README.md` | Este arquivo — visão geral e guia de navegação do repositório. |
+| `sfdx-project.json` | Configuração do projeto Salesforce DX (diretório-fonte, plugins, namespace). |
+| `.env.example` | Template de variáveis de ambiente — copie para `.env` localmente e preencha os secrets. |
+| `.devin.yaml` | Configuração específica do agente Devin (Cognition). |
 
 ---
 
