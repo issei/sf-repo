@@ -27,6 +27,10 @@ check "node" ">=20.0.0" "$NODE_VER"
 SF_VER=$(sf --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+' | head -1 || echo "")
 check "sf CLI" ">=2.0.0" "$SF_VER"
 
+# Flosum CLI
+FLOSUM_VER=$(flosum --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+' | head -1 || echo "")
+check "@flosum/cli" ">=1.0.0" "$FLOSUM_VER"
+
 # Python 3
 PY_VER=$(python3 --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+' || echo "")
 check "python3" ">=3.11.0" "$PY_VER"
@@ -39,10 +43,10 @@ check "jq" ">=1.6" "$JQ_VER"
 GIT_VER=$(git --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+' || echo "")
 check "git" ">=2.40.0" "$GIT_VER"
 
-# Python packages
+# Python packages (apenas scripts de validação — sem dependências de API Flosum)
 echo ""
-echo "🔍 Verificando pacotes Python..."
-for pkg in requests pyyaml python-dotenv tabulate; do
+echo "🔍 Verificando pacotes Python (validação)..."
+for pkg in pyyaml python-dotenv tabulate; do
   if python3 -c "import ${pkg//-/_}" 2>/dev/null; then
     echo "✅ python: ${pkg}"
     ((PASS++))

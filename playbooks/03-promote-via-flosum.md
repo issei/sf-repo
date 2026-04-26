@@ -1,111 +1,109 @@
-# Playbook 03 — Promover via Flosum
+# Playbook 03 — Promover via Flosum (Git-Native)
 
-**Quando usar:** Após PR aprovado por revisores humanos e CI passando.
+**Quando usar:** Após o desenvolvimento estar concluído, validação checkOnly passou e o código está pronto para revisão.
 
-**Pré-requisitos:** PR aprovado com todos os checks de CI verde.
+**Pré-requisitos:** Branch criada, testes Apex passando, `check-metadata-ownership.py` sem violações.
+
+> **Princípio fundamental:** A promoção ocorre **exclusivamente via merge do Pull Request
+> na branch `main`**. O Devin não faz deploy de código para QA ou Prod.
+> O Devin abre o PR no GitHub e, após aprovação humana e merge, o **webhook nativo do
+> Flosum** assume o pacote e o implanta nas Orgs alvo automaticamente.
 
 ---
 
-## Passo 1: Confirmar aprovação do PR
+## Passo 1: Confirmar pré-requisitos antes de abrir o PR
 
-Verificar que o PR tem:
+- [ ] Validação checkOnly passou na org QA:
+  ```bash
+  sf project deploy start \
+    --check-only \
+    --source-dir force-app \
+    --target-org qa \
+    --test-level RunLocalTests
+  ```
+- [ ] Ownership verificado: `python3 scripts/validation/check-metadata-ownership.py`
+- [ ] Mudanças destrutivas verificadas (se aplicável): `python3 scripts/validation/check-destructive-changes.py`
+- [ ] Componentes compartilhados verificados: `python3 scripts/validation/check-shared-components.py`
+- [ ] Todos os arquivos staged e commitados na branch `devin/{ticket}-{slug}`
+
+🛑 **PARADA:** Se qualquer verificação falhar, corrija antes de abrir o PR.
+
+---
+
+## Passo 2: Abrir o Pull Request
+
+```bash
+gh pr create \
+  --title "feat(<escopo>): <descrição curta> [SN-XXXXX]" \
+  --body-file .github/PULL_REQUEST_TEMPLATE.md \
+  --base main
+```
+
+O PR acionará automaticamente os workflows de CI:
+- `validate-pr.yml` — validação e testes Apex na org QA
+- `check-metadata-ownership.yml` — verificação de ownership e mudanças destrutivas
+
+---
+
+## Passo 3: Aguardar aprovação humana
+
+🛑 **PARADA HUMANA OBRIGATÓRIA:** O Devin não avança após abrir o PR.
+
+O PR deve ter:
 - [ ] Aprovação de pelo menos 1 revisor humano
-- [ ] Todos os checks de CI passando (validate-pr, check-metadata-ownership)
+- [ ] Todos os checks de CI passando (verde)
 - [ ] Label `approved-destructive` se houver mudanças destrutivas
 
-🛑 **PARADA:** Se o PR não tiver aprovação humana, não prosseguir.
+O revisor humano é responsável por fazer o **merge** do PR em `main`.
 
-## Passo 2: Criar branch no Flosum
+---
 
-```bash
-python3 scripts/flosum/create-branch.py \
-  --name "devin/${BRANCH_NAME}" \
-  --pipeline-id "${FLOSUM_PIPELINE_ID}" \
-  --commit-sha "$(git rev-parse HEAD)" \
-  --pr-number "${PR_NUMBER}"
+## Passo 4: Promoção automática pelo Flosum (pós-merge)
+
+Após o merge em `main`, o Flosum detecta a mudança via webhook nativo do GitHub e executa o pipeline de promoção automaticamente:
+
+```
+main (merge) → Flosum Webhook → QA → (aprovação Tech Lead) → PreProd → (aprovação humana) → Prod
 ```
 
-Guardar o ID retornado como `FLOSUM_BRANCH_ID`.
+O Devin **não executa nenhum comando** nesta etapa. O monitoramento do pipeline é feito diretamente na interface web do Flosum.
 
-## Passo 3: Vincular commit ao branch Flosum
+---
+
+## Passo 5: Verificação pós-promoção (opcional)
+
+Se solicitado pelo Tech Lead, verificar o estado da org após promoção:
 
 ```bash
-python3 scripts/flosum/link-commit-to-branch.py \
-  --flosum-branch-id "${FLOSUM_BRANCH_ID}" \
-  --commit-sha "$(git rev-parse HEAD)" \
-  --pr-url "${PR_URL}"
+# Verificar que os componentes estão na org QA
+sf org list metadata \
+  --metadata-type ApexClass \
+  --target-org qa
 ```
 
-## Passo 4: Disparar promoção para QA
-
+Gerar relatório de deploy se necessário:
 ```bash
-python3 scripts/flosum/trigger-promotion.py \
-  --branch-id "${FLOSUM_BRANCH_ID}" \
-  --target-environment "qa" \
-  --pipeline-id "${FLOSUM_PIPELINE_ID}"
-```
-
-## Passo 5: Monitorar status da promoção
-
-```bash
-# Polling a cada 30 segundos, máximo 20 tentativas
-for i in {1..20}; do
-  python3 scripts/flosum/get-promotion-status.py \
-    --branch-id "${FLOSUM_BRANCH_ID}" \
-    --pipeline-id "${FLOSUM_PIPELINE_ID}"
-  sleep 30
-done
-```
-
-Status possíveis:
-- `Pending` / `In Progress` — aguardar
-- `Succeeded` — prosseguir para Passo 6
-- `Failed` — registrar falha e consultar Playbook 04 ou 05
-
-## Passo 6: Confirmar promoção QA bem-sucedida
-
-Se `Succeeded`:
-- Gerar relatório de deploy: `python3 scripts/reporting/generate-deploy-report.py`
-- Comentar no PR com o resultado
-- Tag automática será criada: `flosum/promoted/qa/YYYYMMDD-HHMMSS`
-
-## Passo 7: Promoção para PreProd
-
-Repetir Passos 4 a 6 com `--target-environment "preprod"`.
-
-Requer aprovação adicional do Tech Lead antes de prosseguir.
-
-## Passo 8: Promoção para Produção
-
-🛑 **PARADA HUMANA OBRIGATÓRIA:** Promoção para Produção requer:
-1. PR completamente aprovado e mergeado em `main`
-2. Comentário explícito no PR: `/approve-prod-promotion`
-3. Aprovação do Tech Lead ou Product Owner
-
-Só prosseguir após estas condições serem atendidas.
-
-```bash
-python3 scripts/flosum/trigger-promotion.py \
-  --branch-id "${FLOSUM_BRANCH_ID}" \
-  --target-environment "prod" \
-  --pipeline-id "${FLOSUM_PIPELINE_ID}"
+python3 scripts/reporting/generate-deploy-report.py
 ```
 
 ---
 
-## Tratamento de Falhas
+## Tratamento de Falhas no Pipeline Flosum
 
-Se qualquer passo falhar:
-1. Registrar falha: `python3 scripts/reporting/log-failure.py --type flosum_api --error "..." --context "promoção QA"`
-2. Consultar `knowledge-base/known-issues.md`
-3. Se não houver solução conhecida, acionar revisão humana
+Se o pipeline Flosum reportar falha após o merge:
+
+1. **NÃO tente re-executar comandos de deploy diretamente**
+2. Registrar a falha: `python3 scripts/reporting/log-failure.py --type flosum_pipeline --error "..." --context "promoção QA"`
+3. Consultar `knowledge-base/known-issues.md`
+4. Acionar revisão humana com o log de erro do Flosum
 
 ---
 
 ## Verificação Final
 
-- [ ] Promoção QA — Succeeded
-- [ ] Promoção PreProd — Succeeded (se aplicável)
-- [ ] Promoção Prod — Succeeded (se aplicável, com aprovação humana)
-- [ ] Tags de rastreabilidade criadas
-- [ ] Relatório de deploy gerado em `reports/`
+- [ ] PR aberto com template preenchido
+- [ ] CI passou (validate-pr + check-metadata-ownership)
+- [ ] PR aprovado por revisor humano
+- [ ] Merge em `main` realizado pelo revisor
+- [ ] Pipeline Flosum executando (monitorar na interface web do Flosum)
+- [ ] Relatório de deploy gerado em `reports/` (se solicitado)

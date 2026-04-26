@@ -5,14 +5,31 @@
 
 ---
 
+## ⭐ Regra de Ouro da Orquestração
+
+> **O Devin opera localmente via Devin CLI ou Workspace. O fluxo correto é:**
+> 1. Ler a spec em `specs/`
+> 2. Codificar em `force-app/`
+> 3. Validar via `sf project deploy start --check-only` na Sandbox
+> 4. Abrir o PR no GitHub
+>
+> **O DEVIN NUNCA USA COMANDOS DIRETOS DE DEPLOY PARA AMBIENTES COMPARTILHADOS (QA/PROD).**
+> Quem faz deploy é o **Flosum**, escutando o merge da branch `main` no Git via webhook nativo.
+> O Devin não executa, não monitora e não re-tenta promoções de pipeline — isso é responsabilidade
+> do Flosum e do revisor humano após o merge.
+
+---
+
 ## 1. Identidade do Projeto
 
-Este é um **projeto Salesforce** gerenciado com **Salesforce DX (SFDX)** e integrado ao pipeline de CI/CD via **Flosum**.
+Este é um **projeto Salesforce** gerenciado com **Salesforce DX (SFDX)** e integrado ao pipeline de CI/CD via **Flosum** com sincronização nativa de Git.
 
 - **Paradigma:** Desenvolvimento baseado em pacotes modulares (Unlocked Packages ou 2GP).
-- **Ferramenta de Deploy:** Flosum CLI (`flosum-sfdx-plugin`) orquestrando promoções entre ambientes.
-- **Ambientes conhecidos:** Scratch Org (desenvolvimento efêmero), QA (`org-qa`), Produção.
-- **Controle de versão:** Git. Toda entrega deve passar por Pull Request revisado.
+- **Ferramenta de Deploy:** Flosum via webhook nativo do GitHub — o merge em `main` dispara o pipeline automaticamente.
+- **Ferramenta de Validação:** `@salesforce/cli` (`sf`) — usada **apenas** para `--check-only` em Sandbox.
+- **Ferramenta de Orquestração Flosum:** `@flosum/cli` — para operações locais de snapshot e diagnóstico quando necessário.
+- **Ambientes conhecidos:** Sandbox QA (`org-qa`), PreProd, Produção.
+- **Controle de versão:** Git. Toda entrega deve passar por Pull Request revisado e mergeado em `main`.
 
 ---
 
