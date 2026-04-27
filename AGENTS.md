@@ -1,158 +1,269 @@
-# AGENTS.md — Diretrizes para Sessões Autônomas (Devin / Cognition)
+# AGENTS.md — Diretrizes de Sessão para o Devin
 
 > **Leia este arquivo integralmente antes de executar qualquer tarefa.**
-> Ele é a fonte da verdade para o comportamento do agente neste repositório.
+> Este é o contrato de comportamento do agente neste repositório.
+> Para o guia completo de arquitetura e metodologia, leia também `devin-repo-spec.md`.
 
 ---
 
-## ⭐ Regra de Ouro da Orquestração
+## Regra de Ouro
 
-> **O Devin opera localmente via Devin CLI ou Workspace. O fluxo correto é:**
-> 1. Ler a spec em `specs/`
-> 2. Codificar em `force-app/`
-> 3. Validar via `sf project deploy start --check-only` na Sandbox
-> 4. Abrir o PR no GitHub
+> O Devin opera localmente via Devin CLI. O fluxo correto é:
 >
-> **O DEVIN NUNCA USA COMANDOS DIRETOS DE DEPLOY PARA AMBIENTES COMPARTILHADOS (QA/PROD).**
-> Quem faz deploy é o **Flosum**, escutando o merge da branch `main` no Git via webhook nativo.
-> O Devin não executa, não monitora e não re-tenta promoções de pipeline — isso é responsabilidade
-> do Flosum e do revisor humano após o merge.
+> 1. Ler a spec em `specs/`
+> 2. Criar branch no Flosum via `flosum branch create`
+> 3. Recuperar metadados afetados via Snapshot Parcial do Flosum
+> 4. Codificar em `force-app/`
+> 5. Validar via `sf project deploy start --check-only` na Sandbox local
+> 6. Abrir Pull Request no GitHub
+>
+> **O Devin NUNCA usa `sf project deploy start` (sem `--check-only`) em QA, PreProd ou Produção.**
+> Quem promove é o **Flosum**, disparado automaticamente pelo merge em `main` via webhook.
 
 ---
 
-## 1. Identidade do Projeto
+## 1. Inicialização de Sessão (Execute Sempre ao Iniciar)
 
-Este é um **projeto Salesforce** gerenciado com **Salesforce DX (SFDX)** e integrado ao pipeline de CI/CD via **Flosum** com sincronização nativa de Git.
+Toda nova sessão do Devin começa com estes dois passos, nesta ordem:
 
-- **Paradigma:** Desenvolvimento baseado em pacotes modulares (Unlocked Packages ou 2GP).
-- **Ferramenta de Deploy:** Flosum via webhook nativo do GitHub — o merge em `main` dispara o pipeline automaticamente.
-- **Ferramenta de Validação:** `@salesforce/cli` (`sf`) — usada **apenas** para `--check-only` em Sandbox.
-- **Ferramenta de Orquestração Flosum:** `@flosum/cli` — para operações locais de snapshot e diagnóstico quando necessário.
-- **Ambientes conhecidos:** Sandbox QA (`org-qa`), PreProd, Produção.
-- **Controle de versão:** Git. Toda entrega deve passar por Pull Request revisado e mergeado em `main`.
-
----
-
-## 2. Protocolo Obrigatório de Inicialização de Sessão
-
-**Toda vez que uma nova sessão for iniciada neste repositório, você DEVE executar os scripts de setup na ordem abaixo antes de realizar qualquer outra ação.**
-
-Isso garante que a máquina virtual do Devin tenha todas as ferramentas instaladas e as credenciais configuradas, independentemente de qual VM foi alocada.
-
-### Passo 1 — Preparar o ambiente (ferramentas e CLIs)
+### Passo 1 — Instalar ferramentas
 
 ```bash
 bash scripts/01_setup_env.sh
 ```
 
-Este script irá:
-- Verificar e instalar o **Node.js LTS** (via `nodesource`) caso ausente.
-- Instalar o **Salesforce CLI** (`@salesforce/cli`) globalmente via npm.
-- Instalar os plugins obrigatórios: `flosum-sfdx-plugin`, `@salesforce/plugin-code-analyzer`, `sfdmu`, `sfdx-git-delta`.
-- Aplicar configurações globais (telemetria desabilitada, memória Node aumentada).
+O script instala: Node.js LTS, Salesforce CLI (`@salesforce/cli`), Flosum CLI (`@flosum/cli`),
+plugins obrigatórios (`@salesforce/plugin-code-analyzer`, `sfdx-git-delta`) e dependências Python.
 
-### Passo 2 — Autenticar nas Orgs Salesforce
+### Passo 2 — Autenticar nas orgs
 
-```bash
-bash scripts/02_auth_orgs.sh
-```
-
-Este script irá:
-- Validar que os **Secrets obrigatórios** estão definidos no painel da Cognition (`SF_CLIENT_ID`, `SF_USERNAME_QA`, `SF_JWT_KEY_BASE64`).
-- Decodificar o certificado JWT a partir de Base64 e realizar a autenticação headless via `sf org login jwt`.
-- Validar a conexão exibindo os detalhes da Org autenticada.
-- **Apagar automaticamente** o arquivo `server.key` do disco ao final (trap `EXIT`).
-
-> **Se qualquer um dos scripts falhar**, interrompa a tarefa e reporte o erro exato ao Tech Lead antes de prosseguir. Não tente contornar falhas de autenticação.
-
----
-
-## 3. Fluxo de Trabalho Padrão (após inicialização)
-
-Após a inicialização bem-sucedida, siga os playbooks na ordem:
-
-| Ordem | Arquivo | Objetivo |
-|-------|---------|----------|
-| 1 | `playbooks/01_development.md` | Criação de Scratch Org, desenvolvimento, testes Apex e análise estática |
-| 2 | `playbooks/02_flosum_validation.md` *(a criar)* | Validação do pacote via Flosum CLI contra QA |
-| 3 | `playbooks/03_pr_and_merge.md` *(a criar)* | Abertura e revisão de Pull Request |
-
----
-
-## 4. Restrições e Regras de Segurança
-
-### 4.1 Arquivos proibidos de commitar
-
-Nunca adicione ao Git, sob nenhuma circunstância:
-- `server.key` ou qualquer arquivo `*.key`, `*.pem`, `*.p8`, `*.p12`
-- `.env`, `.envrc`, ou qualquer arquivo contendo credenciais em texto plano
-- Arquivos de Profile padrão do Salesforce que pertençam a outros domínios
-
-O `.gitignore` já cobre esses padrões. Se o `git status` mostrar qualquer um desses arquivos como "untracked" ou "modified", **não os adicione e reporte ao Tech Lead**.
-
-### 4.2 Nunca pular a inicialização
-
-Mesmo que a VM pareça ter as ferramentas instaladas de uma sessão anterior, execute os scripts de setup. O Devin opera em ambientes efêmeros — a presença de um binário não garante versão correta ou configuração de autenticação válida.
-
-### 4.3 Configuração de Proxy (se aplicável)
-
-Se o ambiente exigir proxy corporativo, defina as variáveis antes de rodar os scripts:
+**Devin em modo autônomo (CI/Cognition):** usa JWT via Secrets configurados no painel da Cognition.
 
 ```bash
-export HTTP_PROXY="http://<host>:<porta>"
-export HTTPS_PROXY="http://<host>:<porta>"
-export NO_PROXY="localhost,127.0.0.1,.salesforce.com,.force.com"
+# Autenticação headless (Devin autônomo)
+bash scripts/environment/authenticate-orgs.sh
 ```
 
-Essas variáveis devem ser configuradas nos **Secrets do Devin** para persistência entre sessões.
+**Desenvolvedor local:** usa login web interativo (sem necessidade de certificado JWT).
+
+```bash
+# Autenticação web (desenvolvedor local — abre o navegador)
+sf org login web --alias sandbox-dev --instance-url https://test.salesforce.com
+flosum auth login --url $FLOSUM_ORG_URL
+```
+
+> Se o script de autenticação falhar em modo autônomo, pare e reporte o erro exato.
+> Nunca tente contornar falhas de autenticação.
 
 ---
 
-## 5. Estrutura do Repositório
+## 2. Protocolo de Leitura Obrigatória
+
+Antes de escrever qualquer código, leia nesta sequência:
+
+| Ordem | Arquivo | O que aprender |
+|---|---|---|
+| 1 | `knowledge-base/metadata-ownership.yaml` | O que este time pode tocar |
+| 2 | `knowledge-base/org-inventory.md` | IDs, URLs e limites de cada org |
+| 3 | `knowledge-base/flosum-pipeline-map.md` | Como funciona a promoção de ambientes |
+| 4 | `specs/<ticket>.md` | O que implementar nesta sessão |
+
+---
+
+## 3. Fluxo de Trabalho Padrão
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   FLUXO DO DEVIN                        │
+│                                                         │
+│  1. Ler specs/ e knowledge-base/                        │
+│  2. flosum branch create --name "devin/SN-XXXX-slug"    │
+│  3. flosum snapshot partial --components "Tipo:Nome"    │
+│  4. Desenvolver em force-app/                           │
+│  5. python3 scripts/validation/check-metadata-          │
+│       ownership.py                                      │
+│  6. sf project deploy start --check-only                │
+│       --target-org sandbox-dev                          │
+│  7. sf apex run test --code-coverage (≥ 85%)            │
+│  8. gh pr create --base main                            │
+│                                                         │
+│  ── STOP ── (aguardar revisão e merge humano)           │
+│                                                         │
+│  Flosum detecta merge → QA → PreProd → Prod             │
+└─────────────────────────────────────────────────────────┘
+```
+
+Referência completa dos playbooks:
+
+| Playbook | Objetivo |
+|---|---|
+| `playbooks/01_development.md` | Desenvolvimento, testes e validação local |
+| `playbooks/02-develop-and-validate.md` | Validação contra org de QA via checkOnly |
+| `playbooks/03-promote-via-flosum.md` | Promoção via Flosum após merge |
+
+---
+
+## 4. Comandos Flosum CLI (Referência Rápida)
+
+```bash
+# Autenticar no Flosum (interativo, uma vez)
+flosum auth login --url $FLOSUM_ORG_URL
+
+# Criar branch isolada para a funcionalidade
+flosum branch create --name "devin/SN-XXXX-slug"
+
+# Snapshot PARCIAL — recupera apenas os metadados afetados
+# NUNCA use snapshot completo. Apenas os componentes da sua spec.
+flosum snapshot partial \
+  --branch "devin/SN-XXXX-slug" \
+  --components "ApexClass:OrderTrigger,ApexClass:OrderTriggerTest"
+
+# Verificar branches existentes
+flosum branch list
+
+# Ver status do snapshot
+flosum snapshot status --branch "devin/SN-XXXX-slug"
+```
+
+> Consulte `knowledge-base/flosum-pipeline-map.md` para entender o pipeline completo.
+
+---
+
+## 5. Regras de Segurança
+
+### 5.1 Deploy direto é proibido
+
+```bash
+# PROIBIDO em ambientes compartilhados
+sf project deploy start --target-org qa        # ❌
+sf project deploy start --target-org preprod   # ❌
+sf project deploy start --target-org prod      # ❌
+
+# PERMITIDO apenas em sandbox local de desenvolvimento
+sf project deploy start --check-only --target-org sandbox-dev  # ✅ (somente validação)
+sf project deploy start --target-org sandbox-dev               # ✅ (sandbox própria)
+```
+
+### 5.2 Snapshot completo é proibido
+
+```bash
+flosum snapshot full   # ❌ NUNCA. Baixa tudo, inclusive metadados de outros times.
+flosum snapshot partial --components "..."  # ✅ Apenas o que está na spec.
+```
+
+### 5.3 Arquivos que nunca devem ir para o Git
+
+- `server.key`, `*.pem`, `*.p8`, `*.p12` — chaves privadas
+- `.env`, `.envrc` — variáveis de ambiente com credenciais
+- Profiles de outros domínios (verificar antes de `git add`)
+
+O `.gitignore` já cobre esses padrões. Se `git status` mostrar um desses arquivos,
+**não faça `git add` e reporte ao Tech Lead imediatamente**.
+
+### 5.4 Peça ajuda humana se
+
+- Detectar metadata de outro time no conjunto de mudanças
+- A validação `--check-only` falhar com erro não documentado em `knowledge-base/known-issues.md`
+- O webhook do Flosum reportar falha após o merge
+- Qualquer operação destrutiva for necessária
+- Conflito de merge em arquivos XML, Profiles ou Layouts
+
+---
+
+## 6. Variáveis de Ambiente / Secrets
+
+### Para Devin Autônomo (Secrets no painel da Cognition)
+
+| Variável | Descrição |
+|---|---|
+| `SF_CLIENT_ID_QA` | Consumer Key do Connected App — Org QA |
+| `SF_USERNAME_QA` | Username do usuário de integração — Org QA |
+| `SF_JWT_KEY_QA` | Chave RSA privada codificada em Base64 — Org QA |
+| `SF_CLIENT_ID_PREPROD` | Consumer Key — Org PreProd |
+| `SF_USERNAME_PREPROD` | Username — Org PreProd |
+| `SF_JWT_KEY_PREPROD` | Chave RSA privada Base64 — Org PreProd |
+| `SF_CLIENT_ID_PROD` | Consumer Key — Org Produção |
+| `SF_USERNAME_PROD` | Username — Org Produção |
+| `SF_JWT_KEY_PROD` | Chave RSA privada Base64 — Org Produção |
+| `FLOSUM_ORG_URL` | URL da org onde o Flosum está instalado |
+| `FLOSUM_API_TOKEN` | Token de API do Flosum (Connected App) |
+| `FLOSUM_PIPELINE_ID` | ID do pipeline de promoção no Flosum |
+
+### Para Desenvolvedor Local
+
+Apenas `FLOSUM_ORG_URL` é necessário (fornecido pelo Tech Lead).
+Auth Salesforce é feita via `sf org login web` — sem Secrets manuais.
+
+---
+
+## 7. Estrutura do Repositório
 
 ```
 .
-├── AGENTS.md                  ← Este arquivo (leia primeiro)
-├── .gitignore                 ← Ignora node_modules, .env, *.key, etc.
-├── scripts/
-│   ├── 01_setup_env.sh        ← Instalação de ferramentas (rodar sempre ao iniciar)
-│   └── 02_auth_orgs.sh        ← Autenticação JWT nas Orgs Salesforce
-├── docs/                      ← Documentação de arquitetura (adicionar aqui)
+├── AGENTS.md                      ← Este arquivo (leia primeiro)
+├── devin-repo-spec.md             ← Guia completo de arquitetura e metodologia
+├── CLAUDE.md                      ← Instruções de domínio e regras invioláveis
+├── .devin.yaml                    ← Configuração da máquina do Devin
+│
+├── specs/                         ← Especificações das tarefas (O QUÊ fazer)
+│   └── _TEMPLATE.md               ← Template para novas specs
+│
 ├── knowledge-base/
-│   └── 01_domain_boundaries.md ← Limites de domínio do time (leia antes de codar)
+│   ├── metadata-ownership.yaml    ← Ownership por time (consulte antes de codar)
+│   ├── org-inventory.md           ← Orgs, URLs e propósitos
+│   ├── flosum-pipeline-map.md     ← Como funciona o pipeline de promoção
+│   └── known-issues.md            ← Erros conhecidos e workarounds
+│
 ├── playbooks/
-│   └── 01_development.md      ← SOP de desenvolvimento e testes
-└── .agents/
-    └── skills/                ← Agent Skills reutilizáveis (Flosum, SF, etc.)
+│   ├── 01_development.md          ← SOP de desenvolvimento local
+│   ├── 02-develop-and-validate.md ← Validação via checkOnly
+│   └── 03-promote-via-flosum.md   ← Promoção pelo Flosum
+│
+├── .agents/skills/                ← Skills reutilizáveis do Devin
+│   ├── flosum-branch/SKILL.md     ← Branch management via Flosum CLI
+│   ├── flosum-snapshot/SKILL.md   ← Snapshot parcial de metadados
+│   ├── sf-apex/SKILL.md           ← Padrões Apex
+│   └── sf-lwc/SKILL.md            ← Padrões LWC
+│
+├── scripts/
+│   ├── 01_setup_env.sh            ← Setup de ferramentas (rode sempre ao iniciar)
+│   ├── environment/
+│   │   └── authenticate-orgs.sh  ← Auth JWT headless (Devin autônomo)
+│   ├── validation/
+│   │   ├── check-metadata-ownership.py   ← Validar ownership antes de commitar
+│   │   ├── check-destructive-changes.py  ← Detectar mudanças destrutivas
+│   │   └── check-shared-components.py    ← Identificar metadados compartilhados
+│   └── salesforce/
+│       ├── validate-deploy.sh     ← Wrapper para checkOnly
+│       └── run-tests.sh           ← Executar suite de testes Apex
+│
+└── force-app/main/default/        ← Código-fonte Salesforce (SFDX)
 ```
 
 ---
 
-## 6. Variáveis de Ambiente / Secrets Necessários
+## 8. Convenção de Commits
 
-Configure estas variáveis no **Secrets Manager do Devin** (painel da Cognition). Nunca as escreva em arquivos do repositório.
+```
+<tipo>(<escopo>): <descrição curta em português>
 
-| Variável | Descrição |
-|----------|-----------|
-| `SF_CLIENT_ID` | Consumer Key do Connected App registrado na Salesforce |
-| `SF_USERNAME_QA` | Username do usuário de integração na Org de QA |
-| `SF_JWT_KEY_BASE64` | Chave privada RSA codificada em Base64 (`base64 server.key`) |
-| `HTTP_PROXY` | *(Opcional)* Proxy corporativo HTTP |
-| `HTTPS_PROXY` | *(Opcional)* Proxy corporativo HTTPS |
+[corpo opcional — explica o porquê, não o que]
 
----
-
-## 7. Autenticação via Web (fallback interativo)
-
-O fluxo padrão é JWT (headless). Se, por algum motivo, o JWT falhar e for necessária autenticação interativa via navegador, use:
-
-```bash
-sf org login web --alias org-qa --instance-url https://test.salesforce.com
+Flosum-Branch: devin/SN-XXXXX-<slug>
+Flosum-Promotion: <id-da-promoção-se-aplicável>
+Refs: #<número-da-issue>
 ```
 
-> Isso abrirá um link de autorização no terminal. Copie o link, abra em um navegador, faça login com as credenciais da Org e autorize o acesso. O CLI capturará o token automaticamente após o redirecionamento.
+| Tipo | Quando usar |
+|---|---|
+| `feat` | Nova funcionalidade |
+| `fix` | Correção de bug |
+| `refactor` | Reestruturação sem mudança de comportamento |
+| `test` | Adição ou correção de testes |
+| `chore` | Configuração, scripts, dependências |
+| `docs` | Documentação |
 
-Este método **não é recomendado para automação** — use apenas em sessões de depuração manual.
+Escopo: nome do componente ou domínio (ex: `OrderTrigger`, `CommercePricing`)
 
 ---
 

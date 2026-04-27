@@ -1,78 +1,164 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
 # ==============================================================================
-# Script: 01_setup_env.sh
-# Objetivo: Configurar o ambiente operacional do Devin para Salesforce e Flosum
-# Autor: Arquitetura de IA / DevOps
+# 01_setup_env.sh — Setup de ferramentas para o Devin e para desenvolvedores
+#
+# O que este script FAZ:
+#   - Instala Node.js LTS (via nvm, se necessário)
+#   - Instala Salesforce CLI (@salesforce/cli)
+#   - Instala Flosum CLI (@flosum/cli) — nativo, sem plugin intermediário
+#   - Instala plugins obrigatórios (Code Analyzer, SGD)
+#   - Instala dependências Python dos scripts de validação
+#
+# O que este script NÃO FAZ:
+#   - Não autentica em nenhuma org (veja instrução abaixo)
+#   - Não faz deploy de nada
+#   - Não modifica código-fonte
+#
+# Após rodar este script:
+#   → Desenvolvedor local: execute `sf org login web --alias sandbox-dev`
+#   → Devin autônomo: execute `bash scripts/environment/authenticate-orgs.sh`
 # ==============================================================================
 
-# Habilita o "Fail-Fast": o script para imediatamente se qualquer comando falhar
-set -e
-# Garante que falhas em pipes (ex: echo "y" | comando) sejam capturadas
-set -o pipefail
+set -euo pipefail
 
-# Função de log padronizada para facilitar a leitura no terminal do Devin
-log() {
-    echo -e "\n[DEVIN ENV SETUP] 🔹 $1"
-}
+# ── Funções utilitárias ───────────────────────────────────────────────────────
 
-error_handler() {
-    echo -e "\n[DEVIN ENV SETUP] ❌ ERRO CRÍTICO na linha $1. Abortando setup."
-    exit 1
-}
+log()   { echo -e "\n[SETUP] ▸ $1"; }
+ok()    { echo -e "[SETUP] ✅ $1"; }
+warn()  { echo -e "[SETUP] ⚠️  $1"; }
+fail()  { echo -e "[SETUP] ❌ $1"; exit 1; }
 
-# Associa a função de erro ao sinal de saída de erro
-trap 'error_handler $LINENO' ERR
+trap 'fail "Erro inesperado na linha $LINENO. Verifique a saída acima."' ERR
 
-log "Iniciando a preparação do ambiente autônomo..."
+log "Iniciando setup do ambiente Salesforce DevOps..."
+log "Sistema operacional: $(uname -s) $(uname -m)"
 
-# 1. Verificação e Atualização do Node.js
-# O Salesforce CLI e os plugins dependem fortemente de uma versão recente do Node.js
-log "Verificando instalação do Node.js e NPM..."
-if ! command -v npm &> /dev/null; then
-    log "NPM não encontrado. Instalando Node.js (LTS)..."
-    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-    sudo apt-get install -y nodejs
+# ── 1. Node.js via nvm ────────────────────────────────────────────────────────
+
+log "Verificando Node.js..."
+
+if ! command -v node &>/dev/null; then
+  log "Node.js não encontrado. Instalando via nvm..."
+  if ! command -v nvm &>/dev/null && [[ ! -f "$HOME/.nvm/nvm.sh" ]]; then
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+  fi
+  export NVM_DIR="${HOME}/.nvm"
+  # shellcheck source=/dev/null
+  source "${NVM_DIR}/nvm.sh"
+  nvm install 24
+  nvm use 24
+  nvm alias default 24
 else
-    log "Node.js atual: $(node -v)"
+  NODE_VERSION=$(node --version | grep -oP 'v?\K\d+' | head -1)
+  if [[ "$NODE_VERSION" -lt 24 ]]; then
+    warn "Node.js v$(node --version) encontrado, mas a versão mínima é v24.0.0."
+    warn "Atualize com: nvm install 24 && nvm use 24"
+    fail "Node.js versão insuficiente."
+  fi
 fi
 
-# 2. Instalação do Salesforce CLI (sf v2)
-log "Instalando Salesforce CLI (@salesforce/cli) globalmente..."
-# Usamos npm para garantir que não dependemos de instaladores binários específicos do SO
-npm install --global @salesforce/cli@latest
-
-# Verifica se o SF CLI foi instalado corretamente
-if ! command -v sf &> /dev/null; then
-    echo "Falha ao instalar o Salesforce CLI."
-    exit 1
+# Verificar npm também
+NPM_VERSION=$(npm --version | grep -oP '\d+' | head -1)
+if [[ "$NPM_VERSION" -lt 11 ]]; then
+  warn "npm v$(npm --version) encontrado, mas a versão mínima é v11.0.0."
+  warn "Atualize com: npm install -g npm@latest"
+  fail "npm versão insuficiente."
 fi
 
-log "Salesforce CLI instalado com sucesso: $(sf version)"
+ok "Node.js: $(node --version) | npm: $(npm --version)"
 
-# 3. Instalação de Plugins do Ecossistema (Silenciosa)
-# O comando `echo "y"` evita que o prompt de confirmação de trust trave o Devin
-log "Instalando plugin do Flosum (flosum-sfdx-plugin)..."
-echo "y" | sf plugins install flosum-sfdx-plugin
+# ── 2. Salesforce CLI (@salesforce/cli) ──────────────────────────────────────
 
-log "Instalando Salesforce Code Analyzer (SFCA)..."
-echo "y" | sf plugins install @salesforce/plugin-code-analyzer
+log "Verificando Salesforce CLI..."
 
-log "Instalando Salesforce Data Move Utility (SFDMU) para Data Seeding..."
-echo "y" | sf plugins install sfdmu
+if ! command -v sf &>/dev/null; then
+  log "Instalando @salesforce/cli globalmente..."
+  npm install -g @salesforce/cli
+fi
 
-log "Instalando SFDX Git Delta (SGD) para empacotamento cirúrgico..."
-echo "y" | sf plugins install sfdx-git-delta
+SF_VERSION=$(sf --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+' | head -1 || echo "desconhecida")
+ok "Salesforce CLI: v${SF_VERSION}"
 
-# 4. Ajustes de Configuração Global do SFDX
-log "Aplicando configurações globais de telemetria e limites..."
-# Desabilita telemetria para evitar gargalos de rede ou prompts indesejados
-sf config set disable-telemetry=true --global
-# Aumenta o max-old-space-size do Node para lidar com a extração de metadados pesados (ex: Profiles)
-export NODE_OPTIONS="--max-old-space-size=8192"
+# ── 3. Flosum CLI (@flosum/cli) ───────────────────────────────────────────────
+#
+# Usamos @flosum/cli diretamente — NÃO o plugin "flosum-sfdx-plugin".
+# O @flosum/cli é o cliente nativo e oficial da Flosum para operações de
+# branch, snapshot parcial e gerenciamento de pipeline.
 
-log "Ambiente configurado com sucesso! Resumo dos plugins instalados:"
-sf plugins
+log "Verificando Flosum CLI (@flosum/cli)..."
 
-log "Pronto para iniciar a autenticação (02_auth_orgs.sh)."
-exit 0
+if ! command -v flosum &>/dev/null; then
+  log "Instalando @flosum/cli globalmente..."
+  npm install -g @flosum/cli
+fi
+
+FLOSUM_VERSION=$(flosum --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+' | head -1 || echo "instalado")
+ok "Flosum CLI: v${FLOSUM_VERSION}"
+
+# ── 4. Plugins do Salesforce CLI ─────────────────────────────────────────────
+
+log "Instalando plugins obrigatórios do Salesforce CLI..."
+
+install_plugin() {
+  local plugin_name="$1"
+  if sf plugins | grep -q "${plugin_name}"; then
+    ok "Plugin já instalado: ${plugin_name}"
+  else
+    log "Instalando: ${plugin_name}..."
+    echo "y" | sf plugins install "${plugin_name}" 2>&1 | tail -3
+    ok "Plugin instalado: ${plugin_name}"
+  fi
+}
+
+# Análise estática de código Apex e LWC (PMD, ESLint)
+install_plugin "@salesforce/plugin-code-analyzer"
+
+# SFDX Git Delta — empacotamento cirúrgico baseado em diff do Git
+install_plugin "sfdx-git-delta"
+
+# ── 5. Dependências Python ────────────────────────────────────────────────────
+#
+# Usadas pelos scripts de validação em scripts/validation/ e scripts/reporting/
+
+log "Instalando dependências Python (pyyaml, python-dotenv, tabulate)..."
+
+PIP_CMD="pip3"
+if ! command -v pip3 &>/dev/null && command -v pip &>/dev/null; then
+  PIP_CMD="pip"
+fi
+
+${PIP_CMD} install --quiet --upgrade pyyaml python-dotenv tabulate 2>/dev/null \
+  || warn "Falha ao instalar dependências Python. Verifique se o pip está disponível."
+
+ok "Dependências Python instaladas."
+
+# ── 6. Configurações globais do SF CLI ───────────────────────────────────────
+
+log "Aplicando configurações globais..."
+
+sf config set disable-telemetry=true --global 2>/dev/null || true
+
+# Aumenta limite de memória para lidar com metadados grandes (ex: Profiles)
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=8192}"
+
+ok "Configurações aplicadas."
+
+# ── 7. Resumo e próximos passos ───────────────────────────────────────────────
+
+echo ""
+echo "════════════════════════════════════════════════════════════"
+echo "  ✅  Setup concluído com sucesso!"
+echo ""
+echo "  Plugins SF CLI instalados:"
+sf plugins 2>/dev/null | sed 's/^/    /'
+echo ""
+echo "  Próximo passo — Autenticação:"
+echo ""
+echo "  → Desenvolvedor local (abre o navegador):"
+echo "    sf org login web --alias sandbox-dev \\"
+echo "      --instance-url https://test.salesforce.com"
+echo "    flosum auth login --url \$FLOSUM_ORG_URL"
+echo ""
+echo "  → Devin autônomo (JWT headless — requer Secrets configurados):"
+echo "    bash scripts/environment/authenticate-orgs.sh"
+echo "════════════════════════════════════════════════════════════"

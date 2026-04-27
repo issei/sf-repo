@@ -1,19 +1,28 @@
 # .devin.yaml
-# Lido pelo Devin no início de toda sessão. Define comportamento, restrições e contexto.
+# Configuração da máquina do Devin para este repositório.
+# Lido pelo Devin CLI no início de toda sessão.
+# Documentação: https://docs.devin.ai/onboard-devin/environment/blueprint-reference
 
 agent:
-  name: "devin"
-  version: "1.0"
-  primary_instruction_file: "CLAUDE.md"
+  name: "sf-devops-agent"
+  version: "2.0"
+  primary_instruction_file: "AGENTS.md"
+  spec_directory: "specs/"
 
 environment:
-  setup_script: "scripts/environment/setup.sh"
+  # Script de setup executado automaticamente ao iniciar cada sessão
+  setup_script: "scripts/01_setup_env.sh"
   verify_script: "scripts/environment/verify-dependencies.sh"
+
   required_tools:
     - name: "node"
-      version: ">=20.0.0"
+      version: ">=24.0.0"
+    - name: "npm"
+      version: ">=11.0.0"
     - name: "sf"
       version: ">=2.0.0"
+    - name: "flosum"
+      version: ">=1.0.0"
     - name: "python3"
       version: ">=3.11.0"
     - name: "jq"
@@ -21,42 +30,89 @@ environment:
     - name: "git"
       version: ">=2.40.0"
 
+  # Dependências Node.js instaladas via setup_script
+  node_packages:
+    global:
+      - "@salesforce/cli"
+      - "@flosum/cli"
+      - "@salesforce/plugin-code-analyzer"
+      - "sfdx-git-delta"
+
+# Configuração de autenticação por ambiente
+# Para desenvolvedores locais: usar web login interativo (sf org login web)
+# Para Devin em modo autônomo: JWT via Secrets no painel da Cognition
 orgs:
+  - alias: "sandbox-dev"
+    purpose: "development"
+    access: "full"
+    # auth_method para dev local: web (interativo)
+    # auth_method para Devin CI: jwt (headless via Secrets)
+    auth_method: "web"
+    instance_url: "https://test.salesforce.com"
+
   - alias: "qa"
     purpose: "quality-assurance"
-    access: "read-validate"
+    access: "validate-only"
     auth_method: "jwt"
-    credential_env: "SF_JWT_KEY_QA"
+    credential_vars:
+      client_id: "SF_CLIENT_ID_QA"
+      username: "SF_USERNAME_QA"
+      jwt_key_b64: "SF_JWT_KEY_QA"
+      instance_url: "SF_INSTANCE_URL_QA"
+
   - alias: "preprod"
     purpose: "pre-production"
-    access: "read-validate"
+    access: "validate-only"
     auth_method: "jwt"
-    credential_env: "SF_JWT_KEY_PREPROD"
+    credential_vars:
+      client_id: "SF_CLIENT_ID_PREPROD"
+      username: "SF_USERNAME_PREPROD"
+      jwt_key_b64: "SF_JWT_KEY_PREPROD"
+      instance_url: "SF_INSTANCE_URL_PREPROD"
+
   - alias: "prod"
     purpose: "production"
     access: "read-only"
     auth_method: "jwt"
-    credential_env: "SF_JWT_KEY_PROD"
+    credential_vars:
+      client_id: "SF_CLIENT_ID_PROD"
+      username: "SF_USERNAME_PROD"
+      jwt_key_b64: "SF_JWT_KEY_PROD"
+      instance_url: "SF_INSTANCE_URL_PROD"
 
+# Configuração da Flosum CLI (nativa via @flosum/cli)
 flosum:
-  api_base_url_env: "FLOSUM_API_BASE_URL"
-  token_env: "FLOSUM_API_TOKEN"
+  org_url_env: "FLOSUM_ORG_URL"
+  api_token_env: "FLOSUM_API_TOKEN"
   pipeline_id_env: "FLOSUM_PIPELINE_ID"
   branch_prefix: "devin/"
+  # Snapshot PARCIAL sempre. Nunca fazer snapshot completo.
+  snapshot_mode: "partial"
 
+# Regras de segurança automáticas
 safety:
+  # Devin para e pede aprovação humana antes de qualquer uma dessas ações
   require_human_approval_for:
     - destructive_changes
     - prod_promotion
     - shared_component_changes
+    - full_org_snapshot
   ownership_file: "knowledge-base/metadata-ownership.yaml"
-  max_components_per_deploy: 50
+  max_components_per_snapshot: 50
+  # Deploy direto em orgs compartilhadas é bloqueado — apenas checkOnly
+  blocked_commands:
+    - pattern: "sf project deploy start(?!.*--check-only).*--target-org (qa|preprod|prod)"
+      reason: "Deploy direto em ambientes compartilhados. Use --check-only. O Flosum faz o deploy real."
 
+# Convenção de branching
 branching:
   base_branch: "main"
+  devin_prefix: "devin/"
   feature_prefix: "feature/"
   fix_prefix: "fix/"
-  devin_prefix: "devin/"
+  hotfix_prefix: "hotfix/"
   protected_branches:
     - "main"
     - "release/*"
+  # Padrão para branches criadas pelo Devin
+  name_pattern: "devin/{ticket}-{slug}"

@@ -21,7 +21,11 @@ echo ""
 
 # Node.js
 NODE_VER=$(node --version 2>/dev/null | tr -d 'v' || echo "")
-check "node" ">=20.0.0" "$NODE_VER"
+check "node" ">=24.0.0" "$NODE_VER"
+
+# npm
+NPM_VER=$(npm --version 2>/dev/null || echo "")
+check "npm" ">=11.0.0" "$NPM_VER"
 
 # Salesforce CLI
 SF_VER=$(sf --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+' | head -1 || echo "")
