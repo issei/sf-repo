@@ -16,7 +16,9 @@ environment:
 
   required_tools:
     - name: "node"
-      version: ">=20.0.0"
+      version: ">=24.0.0"
+    - name: "npm"
+      version: ">=11.0.0"
     - name: "sf"
       version: ">=2.0.0"
     - name: "flosum"

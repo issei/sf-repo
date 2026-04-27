@@ -45,15 +45,24 @@ if ! command -v node &>/dev/null; then
   export NVM_DIR="${HOME}/.nvm"
   # shellcheck source=/dev/null
   source "${NVM_DIR}/nvm.sh"
-  nvm install 20
-  nvm use 20
-  nvm alias default 20
+  nvm install 24
+  nvm use 24
+  nvm alias default 24
 else
-  NODE_MAJOR=$(node --version | grep -oP '\d+' | head -1)
-  if [[ "$NODE_MAJOR" -lt 20 ]]; then
-    warn "Node.js v$(node --version) encontrado, mas a versão mínima é v20."
-    warn "Atualize com: nvm install 20 && nvm use 20"
+  NODE_VERSION=$(node --version | grep -oP 'v?\K\d+' | head -1)
+  if [[ "$NODE_VERSION" -lt 24 ]]; then
+    warn "Node.js v$(node --version) encontrado, mas a versão mínima é v24.0.0."
+    warn "Atualize com: nvm install 24 && nvm use 24"
+    fail "Node.js versão insuficiente."
   fi
+fi
+
+# Verificar npm também
+NPM_VERSION=$(npm --version | grep -oP '\d+' | head -1)
+if [[ "$NPM_VERSION" -lt 11 ]]; then
+  warn "npm v$(npm --version) encontrado, mas a versão mínima é v11.0.0."
+  warn "Atualize com: npm install -g npm@latest"
+  fail "npm versão insuficiente."
 fi
 
 ok "Node.js: $(node --version) | npm: $(npm --version)"
